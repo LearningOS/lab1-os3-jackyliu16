@@ -121,6 +121,17 @@ pub struct TaskInfo {
     pub time: usize,
 }
 
+// impl core::fmt::Display for TaskInfo {
+//     // 这个 trait 要求 `fmt` 使用与下面的函数完全一致的函数签名
+//     fn fmt(&self, f: &mut core::fmt::Formatter) {
+//         // 仅将 self 的第一个元素写入到给定的输出流 `f`。返回 `fmt:Result`，此
+//         // 结果表明操作成功或失败。注意 `write!` 的用法和 `println!` 很相似。
+//         // write!(f, "{}", self.0)
+//         // sys_write(f, f"status{self.status}\t time:{}");
+//         println!("status{}\ttime{}", self.status, self.time);
+//     }
+// }
+
 impl TaskInfo {
     pub fn new() -> Self {
         TaskInfo {

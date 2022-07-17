@@ -17,14 +17,15 @@ mod loader;
 mod logging;
 mod sbi;
 mod sync;
-mod syscall;
-mod task;
+pub mod syscall;
+pub mod task;
 mod timer;
-mod trap;
+pub mod trap;
 
 core::arch::global_asm!(include_str!("entry.asm"));
 core::arch::global_asm!(include_str!("link_app.S"));
 
+/// clear BSS segment
 fn clear_bss() {
     extern "C" {
         fn sbss();
@@ -37,6 +38,7 @@ fn clear_bss() {
 }
 
 #[no_mangle]
+/// the rust entry-point of os
 pub fn rust_main() -> ! {
     clear_bss();
     logging::init();
