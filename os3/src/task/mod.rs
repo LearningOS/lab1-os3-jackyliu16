@@ -212,9 +212,9 @@ impl TaskManager {
         // we try to using `sql nested update` to attach this condition
         let current_task = inner.current_task;
         inner.tasks[current_task].task_syscall_record[id] += 1;
-        if  id == 64 || id == 93 {
-            println!("task: {} using syscall: {} now it's {}", current_task, id, inner.tasks[current_task].task_syscall_record[id]);
-        }
+        // if  id == 64 || id == 93 {
+        //     println!("task: {} using syscall: {} now it's {}", current_task, id, inner.tasks[current_task].task_syscall_record[id]);
+        // }
     }
 
     // getting information
