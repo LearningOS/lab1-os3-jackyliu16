@@ -12,6 +12,8 @@ use user_lib::{
 pub fn main() -> usize {
     let t1 = get_time() as usize;
     let info = TaskInfo::new();
+    // println!("GO INSIDE THE CH3_taksINfo");
+    // println!("hello!");
     get_time();
     sleep(500);
     let t2 = get_time() as usize;
@@ -20,10 +22,16 @@ pub fn main() -> usize {
     let t3 = get_time() as usize;
     assert!(3 <= info.syscall_times[SYSCALL_GETTIMEOFDAY]);
     assert_eq!(1, info.syscall_times[SYSCALL_TASK_INFO]);
+
+
+    // println!("info.syscall_times[SYSCALL_WRITE]: {}",info.syscall_times[SYSCALL_WRITE]);
+
     assert_eq!(0, info.syscall_times[SYSCALL_WRITE]);
     assert!(0 < info.syscall_times[SYSCALL_YIELD]);
     assert_eq!(0, info.syscall_times[SYSCALL_EXIT]);
     assert!(t2 - t1 <= info.time + 1);
+    // println!("info.time: {}", info.time);
+    // println!("t3 - t1 + 100:{} ", t3-t1+100);
     assert!(info.time < t3 - t1 + 100);
     assert!(info.status == TaskStatus::Running);
 

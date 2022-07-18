@@ -13,10 +13,13 @@ mod context;
 mod switch;
 #[allow(clippy::module_inception)]
 mod task;
-
+#[allow(unused_imports)]
+use crate::timer::get_time_us;
 use crate::config::{MAX_APP_NUM, MAX_SYSCALL_NUM};
 use crate::loader::{get_num_app, init_app_cx};
 use crate::sync::UPSafeCell;
+#[allow(unused_imports)]
+use crate::syscall;
 use lazy_static::*;
 pub use switch::__switch;
 pub use task::{TaskControlBlock, TaskStatus};
@@ -54,6 +57,8 @@ lazy_static! {
         let mut tasks = [TaskControlBlock {
             task_cx: TaskContext::zero_init(),
             task_status: TaskStatus::UnInit,
+            first_time_task_run: 0,
+            task_syscall_record: [0 ; MAX_SYSCALL_NUM],
         }; MAX_APP_NUM];
         for (i, t) in tasks.iter_mut().enumerate().take(num_app) {
             t.task_cx = TaskContext::goto_restore(init_app_cx(i));
@@ -101,6 +106,12 @@ impl TaskManager {
     fn run_first_task(&self) -> ! {
         let mut inner = self.inner.exclusive_access();
         let task0 = &mut inner.tasks[0];
+
+        // self.record_current_first_run_time(0);          // BC we start from the first one 
+        if task0.first_time_task_run != 0 {
+            task0.first_time_task_run = get_time_us();
+        }
+
         task0.task_status = TaskStatus::Running;
         let next_task_cx_ptr = &task0.task_cx as *const TaskContext;
         drop(inner);
@@ -143,8 +154,14 @@ impl TaskManager {
         if let Some(next) = self.find_next_task() {
             let mut inner = self.inner.exclusive_access();
             let current = inner.current_task;
+            // self.record_current_first_run_time(next);
             inner.tasks[next].task_status = TaskStatus::Running;
             inner.current_task = next;
+
+            if inner.tasks[next].first_time_task_run != 0 {
+                inner.tasks[next].first_time_task_run = get_time_us();
+            }
+
             let current_task_cx_ptr = &mut inner.tasks[current].task_cx as *mut TaskContext;
             let next_task_cx_ptr = &inner.tasks[next].task_cx as *const TaskContext;
             drop(inner);
@@ -159,7 +176,71 @@ impl TaskManager {
     }
 
     // TODO LAB1: Try to implement your function to update or get task info!
-    
+
+    /*
+    BC we need to show this kinds of information :
+        TaskStatus:     [FINISH]
+        system_time: 
+            the syscall a application has use 
+            we try to put a public function in task [we will call it in syscall mod]
+        time: 
+            the gap between this time and the first time application has been use  
+            because we need to get the time diff between `sys_task_info` and the first time this task been use
+            so, in my view :
+                we could just record the first time this task has been use.
+                and we account this information when we using `sys_task_info` 
+    */
+
+
+    /// **Because Iteration borrow** we should using it here [ try to embed it in code ]
+    // #[allow(unused_variables)]
+    // #[allow(dead_code)]
+    // pub fn record_current_first_run_time(&self, task_id:usize) {
+    //     let mut inner = self.inner.exclusive_access();
+    //     let current_task = inner.current_task;
+        
+    //     if inner.tasks[current_task].first_time_task_run != 0 {
+    //         inner.tasks[current_task].first_time_task_run = get_time();
+    //     }
+    // }
+
+    #[allow(dead_code)]
+    pub fn add_current_system_call_record(&self, id:usize) {
+        let mut inner = self.inner.exclusive_access();
+        // inner.tasks[inner.current_task].task_syscall_record[id] += 1;
+        // BC inner.current is immutable and inner.tasks is mutable, this two kinds of things couldn't exist at the same time
+        // we try to using `sql nested update` to attach this condition
+        let current_task = inner.current_task;
+        inner.tasks[current_task].task_syscall_record[id] += 1;
+        // if  id == 64 || id == 93 {
+        //     println!("task: {} using syscall: {} now it's {}", current_task, id, inner.tasks[current_task].task_syscall_record[id]);
+        // }
+    }
+
+    // getting information
+    #[allow(dead_code)]
+    pub fn get_current_task_status(&self) -> Option<TaskStatus> {
+        let inner = self.inner.exclusive_access();
+        Some(inner.tasks[inner.current_task].task_status)   // BC we only use Immutable reference so we could using it here 
+    }
+
+    #[allow(dead_code)]
+    pub fn get_current_syscall_record(&self) -> Option<[u32 ; MAX_SYSCALL_NUM]> {
+        let inner = self.inner.exclusive_access();
+        Some(inner.tasks[inner.current_task].task_syscall_record)
+    }
+
+    #[allow(dead_code)]
+    pub fn get_current_task_first_run_time(&self) -> Option<usize> {
+        let inner = self.inner.exclusive_access();
+        Some(inner.tasks[inner.current_task].first_time_task_run)
+    }
+
+    // BUG
+    // pub fn get_task_id(&self) -> usize{
+    //     let inner = self.inner.exclusive_access();
+    //     inner.current_task
+    // }
 }
 
 /// Run the first task in task list.
@@ -197,3 +278,49 @@ pub fn exit_current_and_run_next() {
 
 // TODO LAB1: Public functions implemented here provide interfaces.
 // You may use TASK_MANAGER member functions to handle requests.
+#[allow(dead_code)]
+pub fn record_system_call(id : usize) {
+    TASK_MANAGER.add_current_system_call_record(id);
+}
+
+#[allow(dead_code)]
+pub fn get_current_task_info() -> (TaskStatus, [u32; MAX_SYSCALL_NUM], usize) {
+    // maybe we give a kind of mutable variable is un improper
+    // let mut ret: (TaskStatus, [u32;MAX_SYSCALL_NUM], usize) = (TaskStatus::UnInit, [0; MAX_SYSCALL_NUM], 0);
+    
+    // if let Some(status) = TASK_MANAGER.get_current_task_status() {
+    //     ret.0 = status;
+    // }
+    // if let Some(syscall_record) = TASK_MANAGER.get_current_syscall_record() {
+    //     ret.1 = syscall_record;
+    // }
+    // if let Some(first_run_time) = TASK_MANAGER.get_current_task_first_run_time() {
+    //     ret.2 = first_run_time;
+    // }
+
+    // ret
+
+    let (status, syscall_record, first_run_time) : (TaskStatus, [u32; MAX_SYSCALL_NUM], usize);
+    status = match TASK_MANAGER.get_current_task_status() {
+        Some(status) => status,
+        _ => TaskStatus::UnInit
+    };
+    syscall_record = match TASK_MANAGER.get_current_syscall_record() {
+        Some(syscall_record) => syscall_record,
+        _ => [0; MAX_SYSCALL_NUM],
+    };
+
+    // BC we only record the first run time of this programe so we just using the time right now to sub it 
+    first_run_time = match TASK_MANAGER.get_current_task_first_run_time() {
+        Some(first_run_time) => (get_time_us() - first_run_time) / 1000,
+        _ => 0,
+    };
+    (status, syscall_record, first_run_time)
+}
+
+// #[debug]
+// pub fn print_taks_id(&) {
+    // if TASK_MANAGER.get_task_id() != None {
+        // println!("Current Task: {} ", TASK_MANAGER.get_task_id());
+    // }
+// }

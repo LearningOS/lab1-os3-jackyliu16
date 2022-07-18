@@ -1,7 +1,7 @@
 //! Process management syscalls
-
+#[allow(unused_imports)]
 use crate::config::{MAX_APP_NUM, MAX_SYSCALL_NUM};
-use crate::task::{exit_current_and_run_next, suspend_current_and_run_next, TaskStatus};
+use crate::task::{exit_current_and_run_next, suspend_current_and_run_next, TaskStatus, get_current_task_info};
 use crate::timer::get_time_us;
 
 #[repr(C)]
@@ -16,6 +16,17 @@ pub struct TaskInfo {
     syscall_times: [u32; MAX_SYSCALL_NUM],
     time: usize,
 }
+
+// impl TaskInfo {
+//     pub fn build(self) -> TaskInfo {
+//         TaskInfo { status: (), syscall_times: (), time: () }
+//     }
+// }
+// impl Default for TaskInfo {
+//     fn default() -> Self {
+//         // init part 
+//     }
+// }
 
 /// task exits and submit an exit code
 pub fn sys_exit(exit_code: i32) -> ! {
@@ -44,5 +55,14 @@ pub fn sys_get_time(ts: *mut TimeVal, _tz: usize) -> isize {
 #[allow(unused)]
 /// TODO YOUR JOB: Finish sys_task_info to pass testcases
 pub fn sys_task_info(ti: *mut TaskInfo) -> isize {
-    -1
+    // call task control block for info
+    let (s, st, t) = get_current_task_info();
+    unsafe {
+        (*ti) = TaskInfo {
+            status: s,
+            syscall_times: st,
+            time: t,
+        }
+    };
+    0
 }
